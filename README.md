@@ -60,6 +60,16 @@ var o2 = JSBON.decode(binary); // Object
 
 The module also exports the encoder and decoder object classes, for those who may want to extend them.
 
+The `JSON.encode` function also accepts options as a second argument.
+
+The only option supported so far is `hasCRC`. When enabled, a CRC32 will also be stored, and checked at decoding (with some cost in performances, so this is mostly reserved for case where a data integrity check is required):
+```
+var o1 = { *Some object* };
+var binary = JSBON.encode(o1, { hasCRC: true });
+```
+
+The decoder and encoder throw errors (exceptions) if anything goes wrongs, so you may want to `try..catch` the calls if felt necessary. (For the record, the same comment would apply to JSON.)
+
 ## General principles
 
 The following rules apply:
@@ -100,8 +110,10 @@ o3.children[0].parent === o3; // True
 ## Encoding internal workings
 
 The binary encoding follows the principles detailed hereafter.
-- All data are encoded in Big Endian format.
-- The data stream starts with two tables of strings (TOS), the first for object property names, and the second for all other string values.
+- Data are encoded in Big Endian format, when relevant.
+- First byte encodes the major version (for compatibility check) and the options. The decoder throws an error if data were encoded with a more recent major version.
+- If the CRC option is enabled, a 32-bit unsigned value follows. By design, the CRC32 is currently computed on the encoded objects, but not on the two initial TOS. This may change in later version, if felt preferable.
+- Two tables of strings (TOS) are prepended to the actual data, the first for object property names, and the second for all other string values.
   - The TOS starts with a Count value (see below), and is followed by a many strings as specified.
   - All strings are null-terminated and encoded in UTF-8
 - Data types are encoded with an 8-bit tag:
