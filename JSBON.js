@@ -19,7 +19,20 @@
  *
  * @requires DataStreaam
  */
-var JSBON = (function() {
+(function (root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        // AMD. Register as an anonymous module.
+        define(['DataStream'], factory);
+    } else if (typeof module === 'object' && module.exports) {
+        // Node. Does not work with strict CommonJS, but
+        // only CommonJS-like environments that support module.exports,
+        // like Node.
+        module.exports = factory(require('./DataStream'));
+    } else {
+        // Browser globals (root is window)
+        root.JSBON = factory(root.DataStream);
+    }
+}(this, function (DataStream) {
     "use strict";
 
     /** 
@@ -440,18 +453,6 @@ var JSBON = (function() {
         Serializer: Serializer,
         Unserialize: Unserializer,
     };
-}());
-
-// Export for AMD environments
-if (typeof define === 'function' && define.amd) {
-    define('JSBON', [], function() {
-      return JSBON;
-    });
-  }
-  
-// Export for CommonJS
-if (typeof module === 'object' && module && module.exports) {
-  module.exports = JSBON;
-}
+}));
 
 //EOF
