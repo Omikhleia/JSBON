@@ -516,7 +516,7 @@
         },
         // Exported for those who may want to extend the objects.
         Serializer: Serializer,
-        Unserialize: Unserializer,
+        Unserializer: Unserializer,
     };
 }));
 
