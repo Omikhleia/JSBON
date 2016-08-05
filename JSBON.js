@@ -34,6 +34,8 @@
     }
 }(this, function (DataStream) {
     "use strict";
+    
+    const MAJOR_VERSION = 1;
 
     /** 
      * UTF-8 helper functions
@@ -45,6 +47,41 @@
     function decode_utf8(s) {
       return decodeURIComponent(escape(s));
     }
+    
+    /** 
+     * CRC-32 algorithm
+     * Loosely inspired by sample code on the Internet 
+     */
+
+    var crc32 = (function () {
+        "use strict";
+
+        var table = new Uint32Array(256);
+
+        // Pre-generate crc32 polynomial lookup table
+        var i, tmp, k;
+        for (i = 256; i--;) {
+            var tmp = i;
+
+            for (k = 8; k--;) {
+                tmp = tmp & 1 ? 3988292384 ^ tmp >>> 1 : tmp >>> 1;
+            }
+            table[i] = tmp;
+        }
+
+        // crc32b function
+        // param {Uint8Array} input     Byte array
+        // returns {Uint32}   CRC value
+        return function (data) {
+            var crc = -1; // Begin with all bits set (0xffffffff)
+            var i, l;
+            for (i = 0, l = data.length; i < l; i += 1) {
+                crc = crc >>> 8 ^ table[crc & 255 ^ data[i]];
+            }
+
+            return (crc ^ -1) >>> 0; // Binary NOT
+        };
+    })();
     
     /**
      * Serializer.
@@ -225,11 +262,19 @@
         }
     }
 
-    Serializer.prototype.serializeTOS = function () {
+    Serializer.prototype.serializeTOS = function (options) {
         var next_ds = this.ds;
         
         this.ds = new DataStream();
         this.ds.endianness = DataStream.BIG_ENDIAN;
+        
+        if (options && options.hasCRC) {
+            var crc = crc32(new Uint8Array(next_ds.buffer));
+            this.ds.writeUint8(MAJOR_VERSION | 0x80);
+            this.ds.writeUint32(crc);
+        } else {
+            this.ds.writeUint8(MAJOR_VERSION);
+        }
 
         // Key references
         this.serializeCount(this.string_keys.size);
@@ -250,9 +295,9 @@
         this.ds.buffer = dst;
     };
 
-    Serializer.prototype.encode = function(obj) {
+    Serializer.prototype.encode = function(obj, options) {
         this.serializeComponent(obj);
-        this.serializeTOS();
+        this.serializeTOS(options);
         
         return new Uint8Array(this.ds.buffer);
     }
@@ -415,6 +460,15 @@
     Unserializer.prototype.unserializeTOS = function () {
         var size, i, s;
         
+        var crc, version = this.ds.readUint8();
+        if ((version & 0x0F) > MAJOR_VERSION) {
+            throw new Error("Major version mistmatch");
+        }
+        
+        if (version & 0x80) {
+            crc = this.ds.readUint32();
+        }
+        
         // Key references
         size = this.unserializeCount();
         for (i = 0; i < size; i += 1) {
@@ -428,21 +482,32 @@
             s = decode_utf8(this.ds.readCString());
             this.string_refs.push(s);
         }
+        
+        if (version & 0x80) {
+            var offset = this.ds.position;
+            var raw = this.ds.readUint8Array();
+            var new_crc = crc32(raw);
+            if (new_crc !== crc) {
+                throw new Error("CRC32 checksum mistmach");
+            }
+            // Reset position in buffer
+            this.ds.position = offset;
+        }
     };
 
     Unserializer.prototype.decode = function () {
         this.unserializeTOS();
         this.offset = this.ds.position;
-        return this.unserializeComponent();
+        return this.unserializeComponent(); 
     };
     
     return {
-        encode: function(obj) {
+        encode: function(obj, options) {
             var s = new Serializer();
-            return s.encode(obj);
+            return s.encode(obj, options);
         },
         decode: function(binary) {
-            if (binary === null || (!(binary instanceof ArrayBuffer || binary.buffer instanceof ArrayBuffer))) {
+            if (binary === undefined || binary === null || (!(binary instanceof ArrayBuffer || binary.buffer instanceof ArrayBuffer))) {
                 // Has to be non-null, and and instance of array buffer or one of the binary arrays
                 throw new Error("Invalid data");
             }
