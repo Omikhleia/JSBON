@@ -1,0 +1,22 @@
+{
+  "name": "JSBON",
+  "version": "0.1.0",
+  "description": "JavaScript Binary Object Notation, a module for encoding/decoding object to/from binary",
+  "main": "JSBON.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Omikhleia/JSBON.git"
+  },
+  "keywords": [
+    "binary",
+    "json",
+    "arraybuffer"
+  ],
+  "author": "Omikhleia",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Omikhleia/JSBON/issues"
+  },
+  "homepage": "https://github.com/Omikhleia/JSBON",
+  "readmeFilename": "README.md"
+}
