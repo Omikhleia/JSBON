@@ -87,7 +87,7 @@ var JSBON = (function() {
             throw new Error("Invalid count value " + value);
         }
         
-        if (value < 0x7F) {
+        if (value <= 0x7F) {
             // Short values 0..127 are encoded "as is"
             this.ds.writeUint8(value)
         } else if (value < 0xFFFF) {
@@ -260,7 +260,7 @@ var JSBON = (function() {
         var value;
         var tag = this.ds.readUint8();
 
-        if (tag < 0x7F) {
+        if (tag <= 0x7F) {
             // Short values 0..127 are encoded "as is"
             value = tag;
         } else if (tag === Serializer.COUNT16) {
