@@ -62,7 +62,7 @@ The module also exports the encoder and decoder object classes, for those who ma
 
 The `JSON.encode` function also accepts options as a second argument.
 
-The only option supported so far is `hasCRC`. When enabled, a CRC32 will also be stored, and checked at decoding (with some cost in performances, so this is mostly reserved for case where a data integrity check is required):
+The only option supported so far is `hasCRC`. When enabled, a CRC32 will also be stored, and checked at decoding (with some cost in performances, so this is mostly reserved for cases where a data integrity check is required):
 ```
 var o1 = { *Some object* };
 var binary = JSBON.encode(o1, { hasCRC: true });
@@ -112,7 +112,7 @@ o3.children[0].parent === o3; // True
 The binary encoding follows the principles detailed hereafter.
 - Data are encoded in Big Endian format, when relevant.
 - First byte encodes the major version (for compatibility check) and the options. The decoder throws an error if data were encoded with a more recent major version.
-- If the CRC option is enabled, a 32-bit unsigned value follows. By design, the CRC32 is currently computed on the encoded objects, but not on the two initial TOS. This may change in later version, if felt preferable.
+- If the CRC option is enabled, a 32-bit unsigned value follows. By design, the CRC32 is currently computed on the encoded objects, but not on the two initial TOS. This may change in later versions, if felt preferable.
 - Two tables of strings (TOS) are prepended to the actual data, the first for object property names, and the second for all other string values.
   - The TOS starts with a Count value (see below), and is followed by a many strings as specified.
   - All strings are null-terminated and encoded in UTF-8
