@@ -68,25 +68,25 @@ o3.children[0].parent === o3; // True
 The binary encoding follows the principles detailed hereafter.
 - All data are encoded in Big Endian format.
 - The data stream starts with two tables of strings (TOS), the first for object property names, and the second for all other string values.
--- The TOS starts with a Count value (see below), and is followed by a many strings as specified.
--- All strings are null-terminated and encoded in UTF-8
+  - The TOS starts with a Count value (see below), and is followed by a many strings as specified.
+  - All strings are null-terminated and encoded in UTF-8
 - Data types are encoded with an 8-bit tag:
--- False (0x00), true (0x01), null (0x05), undefined (0x06) are encoded by their tag only,
--- Numbers are encoded differently depending on being integers or not:
---- Int8: tag 0x02 and 8-bit signed value,
---- Int16: tag 0x03 and 16-bit signed value,
---- Int32: tag 0x04 and 32-bit signed value,
---- All other numbers: tag 0x09 and 64-bit float value,
--- String: tag 0x16 and Count value as index in the string TOS,
--- Date: tag 0x20 and 64-bit float value,
--- Object (by reference): tag 0x07, Count value as reference index: position in the binary stream before the TOS are added.
--- Object (by value): tag 0x30, Count value specifiying the number of properties, and then each property with a Count value as index to the property TOS, and the value.
--- Array: tag 0x31, Count value for number of elements and then all elements
--- Uint8Array: tag 0x32, Count value for number of bytes, and then the contents of the Uint8Array itself
+  - False (0x00), true (0x01), null (0x05), undefined (0x06) are encoded by their tag only,
+  - Numbers are encoded differently depending on being integers or not:
+    - Int8: tag 0x02 and 8-bit signed value,
+    - Int16: tag 0x03 and 16-bit signed value,
+    - Int32: tag 0x04 and 32-bit signed value,
+    - All other numbers: tag 0x09 and 64-bit float value,
+  - String: tag 0x16 and Count value as index in the string TOS,
+  - Date: tag 0x20 and 64-bit float value,
+  - Object (by reference): tag 0x07, Count value as reference index: position in the binary stream before the TOS are added.
+  - Object (by value): tag 0x30, Count value specifiying the number of properties, and then each property with a Count value as index to the property TOS, and the value.
+  - Array: tag 0x31, Count value for number of elements and then all elements
+  - Uint8Array: tag 0x32, Count value for number of bytes, and then the contents of the Uint8Array itself
 - Count values are encoded according to their size:
--- Short values 0..127 are encoded in a single byte
--- 0x80 and 16-bit value
--- 0x81 and 32-bit value
+  - Short values 0..127 are encoded in a single byte
+  - 0x80 and 16-bit value
+  - 0x81 and 32-bit value
 
 While not necessarily optimal (and not an aim it itself), this seems to achive a good compression ratio. Very large small objects will likely require more bytes than their JSON encoding, but on large objects with lots of repeated property names (e.g. GeoJSON), the binary encoding is 20-50% smaller the raw JSON. Your mileage may vary depending on your data set.
 
