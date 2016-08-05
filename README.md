@@ -4,17 +4,16 @@ JavaScript Binary Object Notation - a module for encoding/decoding objects from/
 ## Caveat
 
 JSBON (JavaScript Binary Object Notation) is **not** BJSON (Binary JSON) and does not necessarily serve the same purpose.
-If you are looking for binary JSON encoders/decoders, there are several proposals for BJSON (notably Universal Binaray 
+If you are looking for binary JSON encoders/decoders, there are several proposals for BJSON (notably Universal Binary 
 JSON at http://ubjson.org/) which may better fit your needs.
 
 ## Purpose
 
-The aim of this small library is to provide a simple binary format for JavaScript structures, mostly intended for on-disk storage or data transmission. The requirements were to have a reasonably efficient encoding, preserving object structure (including duplicate objects and cyclic references).
+The aim of this small library is to provide a simple binary format for JavaScript structures, mostly intended for on-disk storage or data transmission. The requirements were to have a reasonably efficient encoding, preserving object structures (including duplicate objects and cyclic references).
 
 THIS IS A PRELIMINARY VERSION - Things may certainly be further optimized and improved.
 
-**NOTE**: The library relies on the *DataStream* module (https://github.com/kig/DataStream.js) which is also included here for 
-mere convenience - This might not necessarily be the latest version.
+**NOTE**: The library relies on the *DataStream* module (https://github.com/kig/DataStream.js) which is also included here for mere convenience - This might not necessarily be the latest version.
 
 ## Usage
 
