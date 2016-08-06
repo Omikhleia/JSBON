@@ -207,7 +207,7 @@
             }
 
             // Serialize number of properties
-            var keys = Object.keys(obj);
+            var keys = Object.keys(obj).filter(function(k) { return (typeof this[k] !== "function"); }, obj);
             this.serializeCount(keys.length);
             
             // Serialize each property
