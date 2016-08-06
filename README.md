@@ -9,7 +9,11 @@ JSON* at http://ubjson.org/) which may better fit your needs -- See however sect
 
 ## Purpose
 
-The aim of this small library is to provide a simple binary format for JavaScript structures, mostly intended for on-disk storage or data transmission. The requirements were to have a reasonably efficient encoding, preserving object structures (including duplicate objects and cyclic references).
+The aim of this small library is to provide a simple binary format for JavaScript structures, mostly intended for on-disk storage or data transmission. 
+
+The requirements were to have a reasonably efficient encoding, preserving object structures (including duplicate objects and cyclic references). 
+
+JSBON is my naive approach on that matter, but it aims at being pretty *good* for the task it was made for. (There is a pun intended here.)
 
 THIS IS A PRELIMINARY VERSION - Things may certainly be further optimized and improved.
 
