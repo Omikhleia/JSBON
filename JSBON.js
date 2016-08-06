@@ -201,6 +201,11 @@
             // Keep reference index for cyclic references or mere object copy
             this.object_refs.set(obj, this.ds.position);
 
+            // If object has a toJSON method, honor it
+            if ((obj.toJSON !== undefined) && (typeof obj.toJSON === "function")) {
+                obj = obj.toJSON();
+            }
+
             // Serialize number of properties
             var keys = Object.keys(obj);
             this.serializeCount(keys.length);
@@ -227,12 +232,24 @@
     }
 
     Serializer.prototype.serializeArray = function(array) {
-        this.ds.writeUint8(Serializer.TAG_ARRAY);
-        this.serializeCount(array.length);
-
-        var i;
-        for (i = 0; i < array.length; i += 1) {
-            this.serializeComponent(array[i]);
+        var refindex = this.object_refs.get(array);
+        
+        if (refindex === undefined) {
+            // Array by value
+            this.ds.writeUint8(Serializer.TAG_ARRAY);
+            
+            // Keep reference index for cyclic references or mere object copy
+            this.object_refs.set(array, this.ds.position);
+            
+            this.serializeCount(array.length);
+            var i;
+            for (i = 0; i < array.length; i += 1) {
+                this.serializeComponent(array[i]);
+            }
+        } else {
+            // Array by reference
+            this.ds.writeUint8(Serializer.TAG_OBJECT_REF);
+            this.ds.writeUint32(refindex);
         }
     }
     
@@ -268,6 +285,7 @@
         this.ds = new DataStream();
         this.ds.endianness = DataStream.BIG_ENDIAN;
         
+        // Checksum and options
         if (options && options.hasCRC) {
             var crc = crc32(new Uint8Array(next_ds.buffer));
             this.ds.writeUint8(MAJOR_VERSION | 0x80);
@@ -390,11 +408,14 @@
         return obj;
     };
 
-    Unserializer.prototype.unserializeArray = function(array) {
-        var len = this.unserializeCount();
+    Unserializer.prototype.unserializeArray = function() {
         var arr = [];
+   
+        this.object_refs[this.ds.position] = arr; 
+        var size = this.unserializeCount();
+        
         var i, elem;
-        for (i = 0; i < len; i += 1) {
+        for (i = 0; i < size; i += 1) {
             elem = this.unserializeComponent();
             arr.push(elem);
         }

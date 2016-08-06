@@ -1,6 +1,6 @@
 {
   "name": "JSBON",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "JavaScript Binary Object Notation, a module for encoding/decoding object to/from binary",
   "main": "JSBON.js",
   "repository": {
@@ -10,7 +10,8 @@
   "keywords": [
     "binary",
     "json",
-    "arraybuffer"
+    "arraybuffer",
+    "bjson"
   ],
   "author": "Omikhleia",
   "license": "Apache-2.0",
