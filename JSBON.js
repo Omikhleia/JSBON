@@ -94,6 +94,7 @@
         this.object_refs = new Map(); // Object map for object references
         this.string_keys = new Map(); // Map for key references (i.e. property names)
         this.string_refs = new Map(); // Map for all other string references
+        this.hasCycle = false; // Circular references exist: we don't know yet, so assume false until met.
     };
 
     // Data type tags
@@ -126,6 +127,10 @@
     // Counter tag types > 127
     Serializer.COUNT16            = 0x80;
     Serializer.COUNT32            = 0x81;
+    
+    // Option flags
+    Serializer.OPTION_CRC32       = 0x80;
+    Serializer.OPTION_NOCYCLE     = 0x40;
 
     /**
      * Serialize a positive counter value (e.g. size,  number of items)
@@ -228,6 +233,7 @@
             // Object by reference
             this.ds.writeUint8(Serializer.TAG_OBJECT_REF);
             this.ds.writeUint32(refindex);
+            this.hasCycle = true;
         }
     }
 
@@ -250,6 +256,7 @@
             // Array by reference
             this.ds.writeUint8(Serializer.TAG_OBJECT_REF);
             this.ds.writeUint32(refindex);
+            this.hasCycle = true;
         }
     }
     
@@ -285,13 +292,17 @@
         this.ds = new DataStream();
         this.ds.endianness = DataStream.BIG_ENDIAN;
         
+        var v = MAJOR_VERSION;
+        if (!this.hasCycle) {
+            v |= Serializer.OPTION_NOCYCLE;
+        }
         // Checksum and options
         if (options && options.hasCRC) {
             var crc = crc32(new Uint8Array(next_ds.buffer));
-            this.ds.writeUint8(MAJOR_VERSION | 0x80);
+            this.ds.writeUint8(v | Serializer.OPTION_CRC32 );
             this.ds.writeUint32(crc);
         } else {
-            this.ds.writeUint8(MAJOR_VERSION);
+            this.ds.writeUint8(v);
         }
 
         // Key references
@@ -327,9 +338,10 @@
      */
     var Unserializer = function (arrayBuffer) {
         this.ds = new DataStream(arrayBuffer, 0, DataStream.BIG_ENDIAN);
-        this.object_refs = {}; // Object references
-        this.string_keys = []; // Array for key references
-        this.string_refs = []; // Array for all other string references
+        this.object_refs = new Map(); // Object references
+        this.string_keys = new Map(); // Array for key references
+        this.string_refs = new Map(); // Array for all other string references
+        this.hasCycle = true; // Circular references exist: we don't know yet, so assume true by default
     };
     
     Unserializer.prototype.unserializeCount = function() {
@@ -377,7 +389,7 @@
                 throw new Error("Out of bound reference index");
             }
             
-            string = this.string_refs[index - 1];
+            string = this.string_refs.get(index - 1);
         }
         
         return string;
@@ -390,19 +402,24 @@
     Unserializer.prototype.unserializeObject = function() {
         var obj = {};
 
-        this.object_refs[this.ds.position] = obj;
+        if (this.hasCycle) {
+            this.object_refs.set(this.ds.position, obj);
+        }
+        
         var size = this.unserializeCount();
         
         var i, index, key;
-        for (i = 0; i < size; i += 1) {
+        var max = this.string_keys.size;
+        while (size > 0) {
             index = this.unserializeCount();
             
-            if (index >= this.string_keys.size) {
+            if (index >= max) {
                 throw new Error("Out of bound reference index");
             }
             
-            key = this.string_keys[index];
+            key = this.string_keys.get(index);
             obj[key] = this.unserializeComponent();
+            size -= 1;
         };
         
         return obj;
@@ -411,13 +428,17 @@
     Unserializer.prototype.unserializeArray = function() {
         var arr = [];
    
-        this.object_refs[this.ds.position] = arr; 
+        if (this.hasCycle) {
+            this.object_refs.set(this.ds.position, arr);
+        }
+        
         var size = this.unserializeCount();
         
-        var i, elem;
-        for (i = 0; i < size; i += 1) {
+        var i = 0, elem;
+        while (i < size) {
             elem = this.unserializeComponent();
-            arr.push(elem);
+            arr[i] = elem;
+            i += 1;
         }
         
         return arr;
@@ -432,40 +453,40 @@
             case Serializer.TAG_INT8:
             case Serializer.TAG_INT16:
             case Serializer.TAG_INT32:
-                value = this.unserializeNumber(tag)
+                return this.unserializeNumber(tag)
                 break;
             case Serializer.TAG_OBJECT:
-                value = this.unserializeObject();
+                return this.unserializeObject();
                 break;
             case Serializer.TAG_ARRAY:
-                value = this.unserializeArray();
+                return this.unserializeArray();
                 break;
             case Serializer.TAG_STRING_REF:
-                value = this.unserializeString();
+                return this.unserializeString();
                 break;
             case Serializer.TAG_DATE:
-                value = this.unserializeDate();
+                return this.unserializeDate();
                 break;
             case Serializer.TAG_BOOLEAN_TRUE:
-                value = true;
+                return true;
                 break;
             case Serializer.TAG_BOOLEAN_FALSE:
-                value = false;
+                return false;
                 break;
             case Serializer.TAG_NULL:
-                value = null;
+                return null;
                 break;
             case Serializer.TAG_UNDEFINED:
-                // Keep undefined
+                return; // Keep undefined
                 break;                
             case Serializer.TAG_UINT8ARRAY:
                 size = this.unserializeCount();
-                value = this.ds.readUint8Array(size);
+                return this.ds.readUint8Array(size);
                 break;
             case Serializer.TAG_OBJECT_REF:
-                refindex = this.ds.readUint32() + this.offset;
-                if (this.object_refs[refindex] !== undefined) {
-                    return this.object_refs[refindex];
+                refindex = this.object_refs.get(this.ds.readUint32() + this.offset);
+                if (refindex !== undefined) {
+                    return refindex;
                 } else {
                     throw new Error("Invalid object reference " + refindex);
                 }
@@ -486,25 +507,29 @@
             throw new Error("Major version mistmatch");
         }
         
-        if (version & 0x80) {
+        if (version & Serializer.OPTION_CRC32) {
             crc = this.ds.readUint32();
         }
         
-        // Key references
-        size = this.unserializeCount();
-        for (i = 0; i < size; i += 1) {
-            s = decode_utf8(this.ds.readCString());
-            this.string_keys.push(s);
+        if (version & Serializer.OPTION_NOCYCLE) {
+            this.hasCycle = false;
         }
         
         // Key references
         size = this.unserializeCount();
         for (i = 0; i < size; i += 1) {
             s = decode_utf8(this.ds.readCString());
-            this.string_refs.push(s);
+            this.string_keys.set(i, s);
         }
         
-        if (version & 0x80) {
+        // Key references
+        size = this.unserializeCount();
+        for (i = 0; i < size; i += 1) {
+            s = decode_utf8(this.ds.readCString());
+            this.string_refs.set(i, s);
+        }
+        
+        if (version & Serializer.OPTION_CRC32) {
             var offset = this.ds.position;
             var raw = this.ds.readUint8Array();
             var new_crc = crc32(raw);

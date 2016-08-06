@@ -1,6 +1,6 @@
 {
   "name": "JSBON",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "JavaScript Binary Object Notation, a module for encoding/decoding object to/from binary",
   "main": "JSBON.js",
   "repository": {
