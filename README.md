@@ -4,8 +4,8 @@ JavaScript Binary Object Notation - a module for encoding/decoding objects to/fr
 ## Caveat
 
 JSBON (*JavaScript Binary Object Notation*) is **not** BJSON (*Binary JSON*) and does not necessarily serve the same purpose.
-If you are looking for binary JSON encoders/decoders, there are several proposals for BJSON (notably Universal Binary 
-JSON at http://ubjson.org/) which may better fit your needs.
+If you are looking for binary JSON encoders/decoders, there are several proposals for BJSON (notably *Universal Binary 
+JSON* at http://ubjson.org/) which may better fit your needs.
 
 ## Purpose
 
@@ -34,7 +34,6 @@ Load the scripts in that order:
 Simply require the module:
 ```
   const JSBON = require('./JSBON')
-  
   // Your code goes here
 ```
 
@@ -73,22 +72,22 @@ The decoder and encoder throw errors (exceptions) if anything goes wrongs, so yo
 ## General principles
 
 The following rules apply:
-- Numbers, strings, objects, arrays, null and booleans are obviously supported
-- Undefined properties are kept (as opposed e.g. to JSON)
+- Numbers, strings, objects, arrays, null and booleans are obviously supported,
+- Undefined properties are kept (as opposed e.g. to JSON),
 ```
 var o1 = { a: undefined };
 var binary = JSBON.encode(o1);
 var o2 = JSBON.decode(binary); 
 o2.hasOwnProperty("a"); // True
 ```
-- Dates are supported (and not converted to string as in JSON)
+- Dates are supported (and not converted to string as in JSON),
 ```
 var o1 = { d: new Date() };
 var binary = JSBON.encode(o1);
 var o2 = JSBON.decode(binary); 
 o2.d instanceof Date; // True
 ```
-- Uint8Arrays are also allowed (allowing for binary data to be embedded efficiently)
+- Uint8Arrays are also allowed (allowing for binary data to be embedded efficiently),
 ```
 var o1 = [1, 2, 3];
 var b1 = JSBON.encode(o1);
@@ -97,7 +96,7 @@ var b2 = JSBON.encode(o2);
 var o3 = JSBON.decode(b2); 
 o3.o instanceof Uint8Array; // True
 ```
-- Referenced objects are kept (also allowing circular structures - something JSON cannot do) 
+- Referenced objects are kept (also allowing circular structures - something JSON cannot do),
 ```
 var o1 = { name: "o1", children: [] } ;
 var o2 = { name: "o2", parent: o1 };
@@ -106,16 +105,25 @@ var binary = JSBON.encode(o1);
 var o3 = JSBON.decode(binary); 
 o3.children[0].parent === o3; // True
 ```
+- This also works for arrays,
+- If an object has a `toJSON` method, it is honored, allowing you to specify what should be serialized in your own classes.
+```
+var user = { firstName: "John", lastName: "Smith", 
+  get fullName() { return this.firstName + " " + this.lastName; }
+  toJSON: function() { return { firstName: this.firstName, lastName: this.lastName }; }
+};
+JSBON.decode(JSBON.encode(user)); // { firstName: "John", lastName: "Smith" } 
+```
 
 ## Encoding internal workings
 
 The binary encoding follows the principles detailed hereafter.
-- Data are encoded in Big Endian format, when relevant.
-- First byte encodes the major version (for compatibility check) and the options. The decoder throws an error if data were encoded with a more recent major version.
-- If the CRC option is enabled, a 32-bit unsigned value follows. By design, the CRC32 is currently computed on the encoded objects, but not on the two initial TOS. This may change in later versions, if felt preferable.
-- Two tables of strings (TOS) are prepended to the actual data, the first for object property names, and the second for all other string values.
-  - The TOS starts with a Count value (see below), and is followed by a many strings as specified.
-  - All strings are null-terminated and encoded in UTF-8
+- Data are encoded in Big Endian format, when relevant,
+- First byte encodes the major version (for compatibility check) and the options. The decoder throws an error if data were encoded with a more recent major version,
+- If the CRC option is enabled, a 32-bit unsigned value follows. By design, the CRC32 is currently computed on the encoded objects, but not on the two initial TOS. This may change in later versions, if felt preferable,
+- Two tables of strings (TOS) are prepended to the actual data, the first for object property names, and the second for all other string values:
+  - The TOS starts with a Count value (see below), and is followed by a many strings as specified,
+  - All strings are null-terminated and encoded in UTF-8,
 - Data types are encoded with an 8-bit tag:
   - False (0x00), true (0x01), null (0x05), undefined (0x06) are encoded by their tag only,
   - Numbers are encoded differently depending on being integers or not:
@@ -125,14 +133,14 @@ The binary encoding follows the principles detailed hereafter.
     - All other numbers: tag 0x09 and 64-bit float value,
   - String: tag 0x16 and Count value as index in the string TOS,
   - Date: tag 0x20 and 64-bit float value,
-  - Object (by reference): tag 0x07 and 32-bit unsigned reference index: position in the binary stream before the TOS are added.
-  - Object (by value): tag 0x30, Count value specifiying the number of properties, and then each property with a Count value as index to the property TOS, and the value.
-  - Array: tag 0x31, Count value for number of elements and then all elements
-  - Uint8Array: tag 0x32, Count value for number of bytes, and then the contents of the Uint8Array itself
+  - Object or Array (by reference): tag 0x07 and 32-bit unsigned reference index: position in the binary stream before the TOS are added,
+  - Object (by value): tag 0x30, Count value specifiying the number of properties, and then each property with a Count value as index to the property TOS, and the value,
+  - Array (by value): tag 0x31, Count value for number of elements and then all elements,
+  - Uint8Array: tag 0x32, Count value for number of bytes, and then the contents of the Uint8Array itself,
 - Count values are encoded according to their size:
-  - Short values 0..127 are encoded in a single unsigned byte
-  - 0x80 and 16-bit unsigned value
-  - 0x81 and 32-bit unsigned value
+  - Short values 0..127 are encoded in a single unsigned byte,
+  - 0x80 and 16-bit unsigned value,
+  - 0x81 and 32-bit unsigned value,
 - Some tags are reserved for future use.
 
 While not necessarily optimal (and not an aim it itself), this seems to achive a good compression ratio. Very small objects will likely require more bytes than their JSON encoding, but on large objects with lots of repeated property names (e.g. GeoJSON), the binary encoding may be 20-50% smaller the raw JSON. Your mileage may vary depending on your data set.
