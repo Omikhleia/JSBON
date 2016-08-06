@@ -146,7 +146,7 @@ The binary encoding follows the principles detailed hereafter.
   - 0x81 and 32-bit unsigned value,
 - Some tags are reserved for future use.
 
-While not necessarily optimal (and not an aim it itself), this seems to achive a good compression ratio. Very small objects will likely require more bytes than their JSON encoding, but on large objects with lots of repeated property names (e.g. GeoJSON), the binary encoding may be 20-50% smaller the raw JSON. Your mileage may vary depending on your data set.
+While not necessarily optimal (and not an aim it itself), this seems to achive a good compression ratio. Very small objects will likely require more bytes than their JSON encoding, but on large objects with lots of repeated property names (e.g. GeoJSON), the binary encoding may be 20-50% smaller than the raw JSON. Your mileage may vary depending on your data set.
 
 ## Comparisons
 
@@ -154,15 +154,15 @@ I will use, as a test case, the world countries in GeoJSON format (https://githu
 
 For the mere record, compressing this JSON file with 7Zip (default settings) produces a 4.3 MB file in 7z format and a 6.2 MB file in ZIP format.
 
-Tests performed on August 2016, with NodeJS v6.3.1 and JSBON 0.3.1.
+Tests performed on August 2016, with NodeJS v6.3.1 and JSBON 0.3.x.
 
 **BJSON**
 
-Apparently, BJSON (http://bjson.org/) is only a (poorly written) specification, and I could'nt find any implementation for it.
+Apparently, BJSON (http://bjson.org/) is only a (poorly written) specification, and I could not find any implementation for it.
 
 **UBJSON in ASM.JS**
 
-L16 (https://github.com/artcompiler/L16) is the referenced JavaScript library on http://ubjson.org/ (at the time of writing), and claims using ASM.JS for performances, but I could'nt make anything useful out of it. 
+L16 (https://github.com/artcompiler/L16) is the referenced JavaScript library on http://ubjson.org/ (at the time of writing), and claims using ASM.JS for performances, but I could not make anything useful out of it. 
 Written in 2013, it has no documentation and no clean interface, and looks as a half-baked coding experiment.
 
 **node-ubjson**
@@ -170,7 +170,7 @@ Written in 2013, it has no documentation and no clean interface, and looks as a 
 node-ubjson (https://github.com/Sannis/node-ubjson) also follows the specifications from UBJSON (http://ubjson.org/).
 Despite using NodeJS buffers, version 0.0.8 (Jan. 2015) took more than 60 seconds to asynchronously decode the binary object, versus around 3.7 seconds for JSBON 0.3.1 (and around 1 second with JSBON 0.3.2 after optimizing). Synchronous encoding was much faster (774 ms), outperforming JSBON by a ratio (1881 ms). We may still have room for improvements here, though the performance bottleneck is mostly because of the logic for detecting cycles (i.e. reference caching).
 
-The encoded binary data were 6.3 MB (6626967 bytes) versus 10.5 MB with JSBON, but upon investigation, it turned out that  numbers were encoded as 32-bit floats (likely due to the obscure code around line 67 in *ubjson-pack.js*), losing precision (and identity with the original object)... If we were to allow that in JSBON too (e.g. with an option), we would also end up with a size around 6.3 MB (6609870 bytes, even slightly more compact!).
+The encoded binary data were 6.3 MB (6626967 bytes) versus 10.5 MB with JSBON, but upon investigation, it turned out that  numbers were encoded as 32-bit floats (likely due to the obscure code around line 67 in *ubjson-pack.js*), losing precision (and identity with the original object)... If we were to allow that in JSBON too (e.g. with an option), we would also end up with a size around 6.3 MB (actually 6609870 bytes, even slightly more compact!).
 
 For the record, as a distinct test case, node-ubjson failed at encoding an object with a circular reference. I am unsure whether the UBJSON specification is supposed to cover this case, however.
 
