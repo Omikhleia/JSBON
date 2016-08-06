@@ -5,7 +5,7 @@ JavaScript Binary Object Notation - a module for encoding/decoding objects to/fr
 
 JSBON (*JavaScript Binary Object Notation*) is **not** BJSON (*Binary JSON*) and does not necessarily serve the same purpose.
 If you are looking for binary JSON encoders/decoders, there are several proposals for BJSON (notably *Universal Binary 
-JSON* at http://ubjson.org/) which may better fit your needs -- See however section "Comparisons" further below.
+JSON* at http://ubjson.org/) which may better fit your needs -- See however section "Comparisons" further below for discussion.
 
 ## Purpose
 
@@ -119,7 +119,10 @@ JSBON.decode(JSBON.encode(user)); // { firstName: "John", lastName: "Smith" }
 
 The binary encoding follows the principles detailed hereafter.
 - Data are encoded in Big Endian format, when relevant,
-- First byte encodes the major version (for compatibility check) and the options. The decoder throws an error if data were encoded with a more recent major version,
+- First byte encodes a major version (for compatibility check) and the options:
+  - Version is encoded in bit 1-4 and the decoder throws an error if the data were encoded with a more recent major version,
+  - Bit 8 is the CRC option,
+  - Bit 7 is set if the encoder does not find any circular reference, so that the decoder may skip reference caching (for much better performances),
 - If the CRC option is enabled, a 32-bit unsigned value follows. By design, the CRC32 is currently computed on the encoded objects, but not on the two initial TOS. This may change in later versions, if felt preferable,
 - Two tables of strings (TOS) are prepended to the actual data, the first for object property names, and the second for all other string values:
   - The TOS starts with a Count value (see below), and is followed by a many strings as specified,
@@ -131,7 +134,7 @@ The binary encoding follows the principles detailed hereafter.
     - Int16: tag 0x03 and 16-bit signed value,
     - Int32: tag 0x04 and 32-bit signed value,
     - All other numbers: tag 0x09 and 64-bit float value,
-  - String: tag 0x16 and Count value as index in the string TOS,
+  - String: tag 0x16 and Count value as index in the string TOS, starting at 1 (and index 0 corresponds to the empty string, not present in the string TOS),
   - Date: tag 0x20 and 64-bit float value,
   - Object or Array (by reference): tag 0x07 and 32-bit unsigned reference index: position in the binary stream before the TOS are added,
   - Object (by value): tag 0x30, Count value specifiying the number of properties, and then each property with a Count value as index to the property TOS, and the value,
@@ -147,7 +150,7 @@ While not necessarily optimal (and not an aim it itself), this seems to achive a
 
 ## Comparisons
 
-I will use as a test case the world countries in GeoJSON format (https://github.com/datasets/geo-countries) which is a 23 MB JSON file (or 20.4 MB without spaces), containing 255 countries and more than 63000 coordinates.
+I will use, as a test case, the world countries in GeoJSON format (https://github.com/datasets/geo-countries), which is a 23 MB JSON file (or 20.4 MB without spaces), containing 255 countries and more than 63000 coordinates.
 
 For the mere record, compressing this JSON file with 7Zip (default settings) produces a 4.3 MB file in 7z format and a 6.2 MB file in ZIP format.
 
@@ -165,23 +168,23 @@ Written in 2013, it has no documentation and no clean interface, and looks as a 
 **node-ubjson**
 
 node-ubjson (https://github.com/Sannis/node-ubjson) also follows the specifications from UBJSON (http://ubjson.org/).
-Despite using NodeJS buffers, version 0.0.8 (Jan. 2015) took more than 60 seconds to asynchronously decode the binary object, versus around 3.7 seconds for JSBON 0.3.1. Synchronous encoding was much faster (774 ms), outperforming JSBON (1881 ms). We still have room for improvements here.
+Despite using NodeJS buffers, version 0.0.8 (Jan. 2015) took more than 60 seconds to asynchronously decode the binary object, versus around 3.7 seconds for JSBON 0.3.1 (and around 1 second with JSBON 0.3.2 after optimizing). Synchronous encoding was much faster (774 ms), outperforming JSBON by a ratio (1881 ms). We may still have room for improvements here, though the performance bottleneck is mostly because of the logic for detecting cycles (i.e. reference caching).
 
-The encoded binara data were 6.3 MB (6626967 bytes) versus 10.5 MB with JSBON, but upon investigation, it turned out that (almost?) all numbers were encoded as 32-bit floats (likely due to the obscure code around line 67 in *ubjson-pack.js*), losing precision (and identity to the the original object)... If we were to allow that in JSBON too (e.g. with an option), we would also end up with a size around 6.3 MB (6609870 bytes, even slightly more compact!).
+The encoded binary data were 6.3 MB (6626967 bytes) versus 10.5 MB with JSBON, but upon investigation, it turned out that  numbers were encoded as 32-bit floats (likely due to the obscure code around line 67 in *ubjson-pack.js*), losing precision (and identity with the original object)... If we were to allow that in JSBON too (e.g. with an option), we would also end up with a size around 6.3 MB (6609870 bytes, even slightly more compact!).
 
-For the record, node-ubjson failed at encoding an object with circular reference. I'm unsure whether the UBJSON specification is supposed to cover this case, however.
+For the record, as a distinct test case, node-ubjson failed at encoding an object with a circular reference. I am unsure whether the UBJSON specification is supposed to cover this case, however.
 
 **Others ?**
 
-The following specifications or pieces of code haven't been checked:
-- Some BJSON stuff at https://github.com/asterick/bjson (no documentation...),
-- BSON at http://bsonspec.org/ (c'mon, no JavaScript reference implementation at all? Anyhow, it's a MongoDB thing, with its own purpose, full of specific stuffs stuch as UUID, Min Key, MD5 hash etc.)
-- And probably many other I have overlooked...
+The following specifications or pieces of code have not been checked:
+- Some BJSON code at https://github.com/asterick/bjson (no documentation...),
+- BSON at http://bsonspec.org/ (C'mon, no JavaScript reference implementation at all... Anyhow, it's a MongoDB thing, with its own purpose, full of specific stuffs stuch as UUID, Min Key, MD5 hash, etc.),
+- And probably many others I have overlooked...
 
 **Conclusions**
 
 The BJSON specification is poorly written and seems to lack an implementation.
-The UBJSON specification is full of complex words, long sentences and strange examples (to say the least), but it is rather weird it does not come out-of-the-box with a decent reference JavaScript implementation (to say the least). One would expect better from something that intends to defined a "standard". Even the ASN.1 standard, with all its subtleties, is more readable. Tested implementations are not very satisfying either...
+The UBJSON specification is full of complex words, long sentences and strange examples (to say the least), but it is rather weird that it does not come out-of-the-box with a decent reference JavaScript implementation (to say the least). One would expect better from something that intends to define a "standard". Even the ASN.1 standard, with all its subtleties, is more readable. Tested implementations are not very satisfying either...
 
 ## License
 
