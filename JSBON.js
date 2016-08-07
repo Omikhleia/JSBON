@@ -84,11 +84,11 @@
     })();
     
     /**
-     * Serializer.
+     * Encoder.
      *
      * @constructor
      */
-    var Serializer = function () {
+    var Encoder = function () {
         this.ds = new DataStream();
         this.ds.endianness = DataStream.BIG_ENDIAN;
         this.object_refs = new Map(); // Object map for object references
@@ -98,73 +98,94 @@
     };
 
     // - Data type tags
-    Serializer.TAG_BOOLEAN_FALSE  = 0x00;
-    Serializer.TAG_BOOLEAN_TRUE   = 0x01;
+    Encoder.TAG_BOOLEAN_FALSE  = 0x00;
+    Encoder.TAG_BOOLEAN_TRUE   = 0x01;
     
-    Serializer.TAG_INT8           = 0x02;
-    Serializer.TAG_INT16          = 0x03;
-    Serializer.TAG_INT32          = 0x04;
+    Encoder.TAG_INT8           = 0x02;
+    Encoder.TAG_INT16          = 0x03;
+    Encoder.TAG_INT32          = 0x04;
     
-    Serializer.TAG_NULL           = 0x05;
-    Serializer.TAG_UNDEFINED      = 0x06;
+    Encoder.TAG_NULL           = 0x05;
+    Encoder.TAG_UNDEFINED      = 0x06;
     
-    Serializer.TAG_OBJECT_REF     = 0x07;
+    Encoder.TAG_OBJECT_REF     = 0x07;
     /* 0x08 RESERVED */
     /* May be use if tables of strings are leveraged */
     
-    Serializer.TAG_NUMBER         = 0x09;
+    Encoder.TAG_NUMBER         = 0x09;
     
-    Serializer.TAG_UINT8          = 0x12;
-    Serializer.TAG_UINT16         = 0x13;
-    Serializer.TAG_UINT32         = 0x14;
+    Encoder.TAG_UINT8          = 0x12;
+    Encoder.TAG_UINT16         = 0x13;
+    Encoder.TAG_UINT32         = 0x14;
     
-    Serializer.TAG_STRING_REF     = 0x16;
+    Encoder.TAG_STRING_REF     = 0x16;
     
-    Serializer.TAG_DATE           = 0x20;
+    Encoder.TAG_DATE           = 0x20;
     
-    Serializer.TAG_OBJECT         = 0x30;
-    Serializer.TAG_ARRAY          = 0x31;
-    Serializer.TAG_UINT8ARRAY     = 0x32;
+    Encoder.TAG_OBJECT         = 0x30;
+    Encoder.TAG_ARRAY          = 0x31;
+    Encoder.TAG_UINT8ARRAY     = 0x32;
     /* 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39 RESERVED */
     /* May be used if other binary arrays are implemented */
-    
-    Serializer.TAG_ARRAY_OF       = 0x71; // EXPERIMENTAL
-        
+            
     // - Option flags
-    Serializer.OPTION_CRC32       = 0x80;
-    Serializer.OPTION_NOCYCLE     = 0x40;
+    Encoder.OPTION_CRC32       = 0x80;
+    Encoder.OPTION_NOCYCLE     = 0x40;
 
     function getNumberTag(value) {
         if (value === (value >>> 0)) {
             // Unsigned integer 32-bit
             if ((value & 0xFF) === value) {
-                return Serializer.TAG_UINT8;
+                return Encoder.TAG_UINT8;
             } else if ((value & 0xFFFF) === value) {
-                return Serializer.TAG_UINT16;
+                return Encoder.TAG_UINT16;
             } else {
-                return Serializer.TAG_UINT32;
+                return Encoder.TAG_UINT32;
             }
         } 
 
         if (value === (value | 0)) {
             // Signed integer 32-bit
             if (-128 <= value && value <= 127) {
-                return Serializer.TAG_INT8;
+                return Encoder.TAG_INT8;
             } else if (-32768 <= value && value <= 32767) {
-                return Serializer.TAG_INT16;
+                return Encoder.TAG_INT16;
             } else {
-                return Serializer.TAG_INT32;
+                return Encoder.TAG_INT32;
             }
         }
         
-        return Serializer.TAG_NUMBER;
+        return Encoder.TAG_NUMBER;
+    }
+    
+    function getValueTag(obj) {
+        if (obj === undefined) {
+            return Encoder.TAG_UNDEFINED;
+        } else if (obj === null) {
+            return Encoder.TAG_NULL;
+        } else if (obj instanceof Array) {
+            return Encoder.TAG_ARRAY;
+        } else if (obj instanceof Date) {
+            return Encoder.TAG_DATE;
+        } else if (obj instanceof Uint8Array) {
+            return Encoder.TAG_UINT8ARRAY;
+        } else if (typeof obj === "object") {
+            return Encoder.TAG_OBJECT;
+        } else if (typeof obj === "number") {
+            return getNumberTag(obj);
+        } else if (typeof obj === "string") {
+            return Encoder.TAG_STRING_REF;
+        } else if (typeof obj === "boolean") {
+            return (obj ? Encoder.TAG_BOOLEAN_TRUE : Encoder.TAG_BOOLEAN_FALSE);
+        } else {
+            throw new Error("Unsupported type (as of yet)")
+        }
     }
     
     /**
      * Serialize a positive counter value (e.g. size,  number of items)
-     * 
      */
-    Serializer.prototype.serializeCount = function(value) {
+    Encoder.prototype.serializeCount = function(value) {
         if ((value >>> 0) !== value) {
             // Shall be an unsiged integer
             throw new Error("Invalid count value " + value);
@@ -180,27 +201,25 @@
         this.ds.writeUint8(value);
     }
     
-    Serializer.prototype.serializeNumber = function(value, tag) {      
-        if (tag === Serializer.TAG_INT8) {
+    Encoder.prototype.serializeNumber = function(value, tag) {      
+        if (tag === Encoder.TAG_INT8) {
             this.ds.writeInt8(value)
-        } else if (tag === Serializer.TAG_INT16) {
+        } else if (tag === Encoder.TAG_INT16) {
             this.ds.writeInt16(value)
-        } else if (tag === Serializer.TAG_INT32) {
+        } else if (tag === Encoder.TAG_INT32) {
             this.ds.writeInt32(value)
-        } else if (tag === Serializer.TAG_UINT8) {
+        } else if (tag === Encoder.TAG_UINT8) {
             this.ds.writeUint8(value)
-        } else if (tag === Serializer.TAG_UINT16) {
+        } else if (tag === Encoder.TAG_UINT16) {
             this.ds.writeUint16(value)        
-        } else if (tag === Serializer.TAG_UINT32) {
+        } else if (tag === Encoder.TAG_UINT32) {
             this.ds.writeUint32(value)
         } else {
             this.ds.writeFloat64(value);        
         }
     }
     
-    Serializer.prototype.serializeString = function(string) {
-        this.ds.writeUint8(Serializer.TAG_STRING_REF);
-
+    Encoder.prototype.serializeString = function(string) {
         var index;
         if (string === "") {
             index = 0;
@@ -215,21 +234,21 @@
        this.serializeCount(index);
     };
     
-    Serializer.prototype.serializeDate = function(date) {
-         this.ds.writeUint8(Serializer.TAG_DATE);
+    Encoder.prototype.serializeDate = function(date) {
          this.ds.writeFloat64(date);
     }
     
-    Serializer.prototype.serializeObject = function(obj) {
+    Encoder.prototype.serializeObject = function(obj) {
         var refindex = this.object_refs.get(obj);
         
         if (refindex === undefined) { 
             // Object by value
-            this.ds.writeUint8(Serializer.TAG_OBJECT);
             
             // Keep reference index for cyclic references or mere object copy
             this.object_refs.set(obj, this.ds.position);
-
+            
+            this.ds.writeUint8(Encoder.TAG_OBJECT);
+            
             // If object has a toJSON method, honor it
             if ((obj.toJSON !== undefined) && (typeof obj.toJSON === "function")) {
                 obj = obj.toJSON();
@@ -255,92 +274,84 @@
             };
         } else {
             // Object by reference
-            this.ds.writeUint8(Serializer.TAG_OBJECT_REF);
-            this.serializeCount(refindex);
-            this.hasCycle = true;
-        }
-    }
-
-    Serializer.prototype.serializeArray = function(array) {
-        var refindex = this.object_refs.get(array);
-        
-        if (refindex === undefined) {
-            // Array by value
-            
-            var canOptimize = false, tag;
-            if (this.hasExperimental && (array.length > 0) && (typeof array[0] === "number")) {
-                tag = getNumberTag(array[0]);
-                canOptimize = true;
-                for (let i = 1; i < array.length; i += 1) {
-                    if (tag !== getNumberTag(array[i])) {
-                        canOptimize = false;
-                        break;
-                    }
-                }
-            }
-            
-            if (!canOptimize) {
-                this.ds.writeUint8(Serializer.TAG_ARRAY);
-                
-                // Keep reference index for cyclic references or mere object copy
-                this.object_refs.set(array, this.ds.position);
-                
-                this.serializeCount(array.length);
-                                
-                for (let i = 0; i < array.length; i += 1) {
-                    this.serializeComponent(array[i]);
-                }
-            } else {
-                // EXPERIMENTAL - Array of same number types
-                this.ds.writeUint8(Serializer.TAG_ARRAY_OF);
-                
-                // Keep reference index for cyclic references or mere object copy
-                this.object_refs.set(array, this.ds.position);
-                
-                this.serializeCount(array.length);
-                this.ds.writeUint8(tag);
-                
-                for (let i = 0; i < array.length; i += 1) {
-                    this.serializeNumber(array[i], tag);
-                }
-            }
-        } else {
-            // Array by reference
-            this.ds.writeUint8(Serializer.TAG_OBJECT_REF);
+            this.ds.writeUint8(Encoder.TAG_OBJECT_REF);
             this.serializeCount(refindex);
             this.hasCycle = true;
         }
     }
     
-    Serializer.prototype.serializeComponent = function(obj) {
-        if (obj === undefined) {
-           this.ds.writeUint8(Serializer.TAG_UNDEFINED);
-        } else if (obj === null) {
-           this.ds.writeUint8(Serializer.TAG_NULL);
-        } else if (obj instanceof Array) {
-            this.serializeArray(obj);
-        } else if (obj instanceof Date) {
-            this.serializeDate(obj);
-        } else if (obj instanceof Uint8Array) {
-            this.ds.writeUint8(Serializer.TAG_UINT8ARRAY);
-            this.serializeCount(obj.length);
-            this.ds.writeUint8Array(obj);
-        } else if (typeof obj === "object") {
-            this.serializeObject(obj);
-        } else if (typeof obj === "number") {
-            var tag = getNumberTag(obj);
-            this.ds.writeUint8(tag);
-            this.serializeNumber(obj, tag);
-        } else if (typeof obj === "string") {
-            this.serializeString(obj);      
-        } else if (typeof obj === "boolean") {
-            this.ds.writeUint8(obj ? Serializer.TAG_BOOLEAN_TRUE : Serializer.TAG_BOOLEAN_FALSE);
+    Encoder.prototype.serializeArray = function(array) {
+        var refindex = this.object_refs.get(array);
+        
+        if (refindex === undefined) {
+            // Array by value
+
+            // Keep reference index for cyclic references or mere object copy
+            this.object_refs.set(array, this.ds.position);
+            
+            this.ds.writeUint8(Encoder.TAG_ARRAY);
+            this.serializeCount(array.length);
+                            
+            for (let i = 0; i < array.length; i += 1) {
+                this.serializeComponent(array[i]);
+            }
         } else {
-            throw new Error("Unsupported type (as of yet)")
+            // Array by reference
+            this.ds.writeUint8(Encoder.TAG_OBJECT_REF);
+            this.serializeCount(refindex);
+            this.hasCycle = true;
+        }
+    }
+    
+    Encoder.prototype.serializeComponentPart = function(obj, tag) {    
+        switch (tag) {
+            case Encoder.TAG_NUMBER:
+            case Encoder.TAG_INT8:
+            case Encoder.TAG_INT16:
+            case Encoder.TAG_INT32:
+            case Encoder.TAG_UINT8:
+            case Encoder.TAG_UINT16:
+            case Encoder.TAG_UINT32:
+                this.serializeNumber(obj, tag);
+                break;
+
+            case Encoder.TAG_STRING_REF:
+                this.serializeString(obj);      
+                break;
+            
+            case Encoder.TAG_DATE:
+                this.serializeDate(obj);
+                break;
+
+            case Encoder.TAG_UINT8ARRAY:
+                this.serializeCount(obj.length);
+                this.ds.writeUint8Array(obj);
+            
+            case Encoder.TAG_BOOLEAN_TRUE:
+            case Encoder.TAG_BOOLEAN_FALSE:
+            case Encoder.TAG_NULL:
+            case Encoder.TAG_UNDEFINED:
+                // DO NOTHING
+                break;
+            default:
+                throw new Error("Unexpected tag for component part " + tag);
+        }
+    }
+    
+    Encoder.prototype.serializeComponent = function(obj) {
+        var tag = getValueTag(obj);
+        
+        if (tag == Encoder.TAG_OBJECT) {
+            this.serializeObject(obj);
+        } else if (tag == Encoder.TAG_ARRAY) {
+            this.serializeArray(obj);
+        } else {
+            this.ds.writeUint8(tag);        
+            this.serializeComponentPart(obj, tag);
         }
     }
 
-    Serializer.prototype.serializeTOS = function (options) {
+    Encoder.prototype.serializeTOS = function (options) {
         var next_ds = this.ds;
         
         this.ds = new DataStream();
@@ -348,13 +359,13 @@
         
         var v = MAJOR_VERSION;
         if (!this.hasCycle) {
-            v |= Serializer.OPTION_NOCYCLE;
+            v |= Encoder.OPTION_NOCYCLE;
         }
         
         // Checksum and options
         if (options && options.hasCRC) {
             var crc = crc32(new Uint8Array(next_ds.buffer));
-            this.ds.writeUint8(v | Serializer.OPTION_CRC32 );
+            this.ds.writeUint8(v | Encoder.OPTION_CRC32 );
             this.ds.writeUint32(crc);
         } else {
             this.ds.writeUint8(v);
@@ -379,7 +390,7 @@
         this.ds.buffer = dst;
     };
 
-    Serializer.prototype.encode = function(obj, options) {
+    Encoder.prototype.encode = function(obj, options) {
         if (options && options.hasExperimental) {
             this.hasExperimental = true;
         }
@@ -390,11 +401,11 @@
     }
 
     /**
-     * Unserializer.
+     * Decoder.
      *
      * @constructor
      */
-    var Unserializer = function (arrayBuffer) {
+    var Decoder = function (arrayBuffer) {
         this.ds = new DataStream(arrayBuffer, 0, DataStream.BIG_ENDIAN);
         this.object_refs = new Map(); // Object references
         this.string_keys = new Map(); // Array for key references
@@ -402,7 +413,7 @@
         this.hasCycle = true; // Circular references exist: we don't know yet, so assume true by default
     };
     
-    Unserializer.prototype.unserializeCount = function() {
+    Decoder.prototype.unserializeCount = function() {
         // Read varint (bit 8 of all bytes is 'continue' flag)
         var c = 0, value = 0 >>> 0, b;
         do {
@@ -414,7 +425,7 @@
         return value;
     };
 
-    Unserializer.prototype.unserializeString = function() {
+    Decoder.prototype.unserializeString = function() {
         var string;
         
         var index = this.unserializeCount();
@@ -431,15 +442,15 @@
         return string;
     };
     
-    Unserializer.prototype.unserializeDate = function() {
+    Decoder.prototype.unserializeDate = function() {
         return new Date(this.ds.readFloat64());
     };
 
-    Unserializer.prototype.unserializeObject = function() {
+    Decoder.prototype.unserializeObject = function() {
         var obj = {};
 
         if (this.hasCycle) {
-            this.object_refs.set(this.ds.position, obj);
+            this.object_refs.set(this.ds.position - 1, obj);
         }
         
         var size = this.unserializeCount();
@@ -461,11 +472,11 @@
         return obj;
     };
 
-    Unserializer.prototype.unserializeArray = function() {
+    Decoder.prototype.unserializeArray = function() {
         var arr = [];
    
         if (this.hasCycle) {
-            this.object_refs.set(this.ds.position, arr);
+            this.object_refs.set(this.ds.position - 1, arr);
         }
         
         var size = this.unserializeCount();
@@ -480,102 +491,68 @@
         return arr;
     };
     
-    Unserializer.prototype.unserializeArrayOf = function() {
-        var arr = [];
-   
-        if (this.hasCycle) {
-            this.object_refs.set(this.ds.position, arr);
-        }
+    Decoder.prototype.unserializeComponentPart = function (tag) {
+        var size, refindex;
         
-        var size = this.unserializeCount();
-        var tag = this.ds.readUint8();
-
-        var i = 0, elem;
-        while (i < size) {
-            switch (tag) {
-                case Serializer.TAG_NUMBER:
-                    elem = this.ds.readFloat64(tag);
-                    break;
-                case Serializer.TAG_INT8:
-                    elem = this.ds.readInt8(tag);
-                    break;
-                case Serializer.TAG_INT16:
-                    elem = this.ds.readInt16(tag);
-                    break;
-                case Serializer.TAG_INT32:
-                    elem = this.ds.readInt32(tag);
-                    break;
-                case Serializer.TAG_UINT8:
-                    elem = this.ds.readUint8(tag);
-                    break;
-                case Serializer.TAG_UINT16:
-                    elem = this.ds.readUint16(tag);
-                    break;
-                case Serializer.TAG_UINT32:
-                    elem = this.ds.readUint32(tag);
-                    break;
-                default:
-                    throw new Error("Unexpected tag in ArrayOf " + tag);
-            }
-            arr[i] = elem;
-            i += 1;
-        }
-        
-        return arr;
-    };
-    
-    Unserializer.prototype.unserializeComponent = function () {
-        var value, size, refindex;
-        
-        var tag = this.ds.readUint8();
         switch (tag) {
-            case Serializer.TAG_NUMBER:
+            case Encoder.TAG_NUMBER:
                 return this.ds.readFloat64();
-            case Serializer.TAG_INT8:
+            case Encoder.TAG_INT8:
                 return this.ds.readInt8();
-            case Serializer.TAG_INT16:
+            case Encoder.TAG_INT16:
                 return this.ds.readInt16();
-            case Serializer.TAG_INT32:
+            case Encoder.TAG_INT32:
                 return this.ds.readInt32();
-            case Serializer.TAG_UINT8:
+            case Encoder.TAG_UINT8:
                 return this.ds.readUint8();
-            case Serializer.TAG_UINT16:
+            case Encoder.TAG_UINT16:
                 return this.ds.readUint16();
-            case Serializer.TAG_UINT32:
+            case Encoder.TAG_UINT32:
                 return this.ds.readUint32();
-            case Serializer.TAG_OBJECT:
-                return this.unserializeObject();
-            case Serializer.TAG_ARRAY:
-                return this.unserializeArray();
-            case Serializer.TAG_ARRAY_OF:
-                return this.unserializeArrayOf();
-            case Serializer.TAG_STRING_REF:
+
+            case Encoder.TAG_STRING_REF:
                 return this.unserializeString();
-            case Serializer.TAG_DATE:
+
+            case Encoder.TAG_DATE:
                 return this.unserializeDate();
-            case Serializer.TAG_BOOLEAN_TRUE:
-                return true;
-            case Serializer.TAG_BOOLEAN_FALSE:
-                return false;
-            case Serializer.TAG_NULL:
-                return null;
-            case Serializer.TAG_UNDEFINED:
-                return; // Keep undefined              
-            case Serializer.TAG_UINT8ARRAY:
+
+            case Encoder.TAG_UINT8ARRAY:
                 size = this.unserializeCount();
-                return this.ds.readUint8Array(size);
-            case Serializer.TAG_OBJECT_REF:
+                return this.ds.readUint8Array(size);                
+
+            case Encoder.TAG_BOOLEAN_TRUE:
+                return true;
+            case Encoder.TAG_BOOLEAN_FALSE:
+                return false;
+            case Encoder.TAG_NULL:
+                return null;
+            case Encoder.TAG_UNDEFINED:
+                return; // Keep undefined              
+
+            case Encoder.TAG_OBJECT:
+                return this.unserializeObject();
+            case Encoder.TAG_ARRAY:
+                return this.unserializeArray();
+            case Encoder.TAG_OBJECT_REF:
                 refindex = this.object_refs.get(this.unserializeCount() + this.offset);
                 if (refindex !== undefined) {
                     return refindex;
                 } 
                 throw new Error("Invalid object reference " + refindex);
+
             default:
                 throw new Error("Unexpected tag " + tag);
         }
     };
+    
+    Decoder.prototype.unserializeComponent = function () {
+        var value, size, refindex;
+        
+        var tag = this.ds.readUint8();
+        return this.unserializeComponentPart(tag);
+    };
 
-    Unserializer.prototype.unserializeTOS = function () {
+    Decoder.prototype.unserializeTOS = function () {
         var size, i, s;
         
         var crc, version = this.ds.readUint8();
@@ -583,11 +560,11 @@
             throw new Error("Major version mistmatch");
         }
         
-        if (version & Serializer.OPTION_CRC32) {
+        if (version & Encoder.OPTION_CRC32) {
             crc = this.ds.readUint32();
         }
         
-        if (version & Serializer.OPTION_NOCYCLE) {
+        if (version & Encoder.OPTION_NOCYCLE) {
             this.hasCycle = false;
         }
         
@@ -605,7 +582,7 @@
             this.string_refs.set(i, s);
         }
         
-        if (version & Serializer.OPTION_CRC32) {
+        if (version & Encoder.OPTION_CRC32) {
             var offset = this.ds.position;
             var raw = this.ds.readUint8Array();
             var new_crc = crc32(raw);
@@ -617,7 +594,7 @@
         }
     };
 
-    Unserializer.prototype.decode = function () {
+    Decoder.prototype.decode = function () {
         this.unserializeTOS();
         this.offset = this.ds.position;
         return this.unserializeComponent(); 
@@ -625,7 +602,7 @@
     
     return {
         encode: function(obj, options) {
-            var s = new Serializer();
+            var s = new Encoder();
             return s.encode(obj, options);
         },
         decode: function(binary) {
@@ -633,12 +610,12 @@
                 // Has to be non-null, and and instance of array buffer or one of the binary arrays
                 throw new Error("Invalid data");
             }
-            var u = new Unserializer(binary);
+            var u = new Decoder(binary);
             return u.decode();
         },
         // Exported for those who may want to extend the objects.
-        Serializer: Serializer,
-        Unserializer: Unserializer,
+        Encoder: Encoder,
+        Decoder: Decoder,
     };
 }));
 
