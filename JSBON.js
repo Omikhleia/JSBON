@@ -129,11 +129,7 @@
     /* May be used if other binary arrays are implemented */
     
     Serializer.TAG_ARRAY_OF       = 0x71; // EXPERIMENTAL
-    
-    // - Counter tag types > 127
-    Serializer.COUNT16            = 0x80;
-    Serializer.COUNT32            = 0x81;
-    
+        
     // - Option flags
     Serializer.OPTION_CRC32       = 0x80;
     Serializer.OPTION_NOCYCLE     = 0x40;
@@ -174,16 +170,14 @@
             throw new Error("Invalid count value " + value);
         }
         
-        if (value === (value & 0x7F)) {
-            // Short values 0..127 are encoded "as is"
-            this.ds.writeUint8(value)
-        } else if (value === (value & 0xFFFF)) {
-            this.ds.writeUint8(Serializer.COUNT16);
-            this.ds.writeUint16(value);
-        } else {
-            this.ds.writeUint8(Serializer.COUNT32);
-            this.ds.writeUint32(value);
+        // Write varint (bit 8 of all bytes is 'continue' flag)
+        var b;
+        while (value >= 0x80) {
+            b = (value & 0x7F) | 0x80;
+            this.ds.writeUint8(b);
+            value >>>= 7;
         }
+        this.ds.writeUint8(value);
     }
     
     Serializer.prototype.serializeNumber = function(value, tag) {      
@@ -262,7 +256,7 @@
         } else {
             // Object by reference
             this.ds.writeUint8(Serializer.TAG_OBJECT_REF);
-            this.ds.writeUint32(refindex);
+            this.serializeCount(refindex);
             this.hasCycle = true;
         }
     }
@@ -313,7 +307,7 @@
         } else {
             // Array by reference
             this.ds.writeUint8(Serializer.TAG_OBJECT_REF);
-            this.ds.writeUint32(refindex);
+            this.serializeCount(refindex);
             this.hasCycle = true;
         }
     }
@@ -409,19 +403,14 @@
     };
     
     Unserializer.prototype.unserializeCount = function() {
-        var value;
-        var tag = this.ds.readUint8();
-
-        if (tag <= 0x7F) {
-            // Short values 0..127 are encoded "as is"
-            value = tag;
-        } else if (tag === Serializer.COUNT16) {
-            value = this.ds.readUint16() & 0x0000ffff;
-        } else if (tag === Serializer.COUNT32) {
-            value = this.ds.readUint32();
-        } else {
-            throw new Error("Invalid count value " + value);
-        }
+        // Read varint (bit 8 of all bytes is 'continue' flag)
+        var c = 0, value = 0 >>> 0, b;
+        do {
+            b = this.ds.readUint8();
+            value |= (b & 0x7F) << 7 * c;
+            c += 1;
+        } while ((b & 0x80) !== 0);
+        
         return value;
     };
 
@@ -576,7 +565,7 @@
                 size = this.unserializeCount();
                 return this.ds.readUint8Array(size);
             case Serializer.TAG_OBJECT_REF:
-                refindex = this.object_refs.get(this.ds.readUint32() + this.offset);
+                refindex = this.object_refs.get(this.unserializeCount() + this.offset);
                 if (refindex !== undefined) {
                     return refindex;
                 } 
