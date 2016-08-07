@@ -143,14 +143,11 @@ The binary encoding follows the principles detailed hereafter.
     - All other numbers: tag 0x09 and 64-bit float value,
   - String: tag 0x16 and Count value as index in the string TOS, starting at 1 (and index 0 corresponds to the empty string, not present in the string TOS),
   - Date: tag 0x20 and 64-bit float value,
-  - Object or Array (by reference): tag 0x07 and 32-bit unsigned reference index: position in the binary stream before the TOS are added,
+  - Object or Array (by reference): tag 0x07 and Count value as reference index: position in the binary stream before the TOS are added,
   - Object (by value): tag 0x30, Count value specifiying the number of properties, and then each property with a Count value as index to the property TOS, and the value,
   - Array (by value): tag 0x31, Count value for number of elements and then all elements,
   - Uint8Array: tag 0x32, Count value for number of bytes, and then the contents of the Uint8Array itself,
-- Count values are encoded according to their size:
-  - Short values 0..127 are encoded in a single unsigned byte,
-  - 0x80 and 16-bit unsigned value,
-  - 0x81 and 32-bit unsigned value,
+- Count values are encoded as "varints" (bit 8 of each byte is a "continue" flag), using from 1 to 5 bytes (the latter is very unlikely to occur, and even encoding on 4 bytes should be quite rare)
 - Some tags are reserved for future use.
 
 While not necessarily optimal (and not an aim it itself), this seems to achive a good compression ratio. Very small objects will likely require more bytes than their JSON encoding, but on large objects with lots of repeated property names (e.g. GeoJSON), the binary encoding may be 20-50% smaller than the raw JSON. Your mileage may vary depending on your data set.
@@ -184,14 +181,14 @@ For the record, as a distinct test case, node-ubjson failed at encoding an objec
 **Others ?**
 
 The following specifications or pieces of code have not been checked:
-- Some BJSON code at https://github.com/asterick/bjson (no documentation...),
-- BSON at http://bsonspec.org/ (C'mon, no JavaScript reference implementation at all... Anyhow, it's a MongoDB thing, with its own purpose, full of specific stuffs stuch as UUID, Min Key, MD5 hash, etc.),
+- Some BJSON code at https://github.com/asterick/bjson (zero documentation...),
+- BSON at http://bsonspec.org/ (no stand-alone JavaScript reference implementation... Anyhow, it's a MongoDB thing, with its own purpose, full of specific stuffs stuch as UUID, Min Key, MD5 hash, etc.),
 - And probably many others I have overlooked...
 
 **Conclusions**
 
 The BJSON specification is poorly written and seems to lack an implementation.
-The UBJSON specification is full of complex words, long sentences and strange examples (to say the least), but it is rather weird that it does not come out-of-the-box with a decent reference JavaScript implementation (to say the least). One would expect better from something that intends to define a "standard". Even the ASN.1 standard, with all its subtleties, is more readable. Tested implementations are not very satisfying either...
+The UBJSON specification much better, though is full of complex words, long sentences and strange examples (to say the least). But it is rather weird that it does not come out-of-the-box with a decent reference JavaScript implementation (to say the least). One would expect better from something that intends to define a "standard". Even the ASN.1 standard, with all its subtleties, is more readable. Tested implementations are not very satisfying either...
 
 ## License
 
