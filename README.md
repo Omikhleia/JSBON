@@ -111,7 +111,7 @@ o3.children[0].parent === o3; // True
 - If an object has a `toJSON` method, it is honored, allowing you to specify what should be serialized in your own classes.
 ```
 var user = { firstName: "John", lastName: "Smith", 
-  get fullName() { return this.firstName + " " + this.lastName; }
+  get fullName() { return this.firstName + " " + this.lastName; },
   toJSON: function() { return { firstName: this.firstName, lastName: this.lastName }; }
 };
 JSBON.decode(JSBON.encode(user)); // { firstName: "John", lastName: "Smith" } 
