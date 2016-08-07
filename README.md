@@ -15,8 +15,6 @@ The requirements were to have a reasonably efficient encoding, preserving object
 
 JSBON is my naive approach on that matter, but it aims at being pretty *good* for the task it was made for. (There is a pun intended here.)
 
-THIS IS A PRELIMINARY VERSION - Things may certainly be further optimized and improved.
-
 **NOTE**: The library relies on the *DataStream* module (https://github.com/kig/DataStream.js) which is also included here for mere convenience - This might not necessarily be the latest version.
 
 ## Documentation
@@ -188,7 +186,7 @@ The following specifications or pieces of code have not been checked:
 **Conclusions**
 
 The BJSON specification is poorly written and seems to lack an implementation.
-The UBJSON specification much better, though is full of complex words, long sentences and strange examples (to say the least). But it is rather weird that it does not come out-of-the-box with a decent reference JavaScript implementation (to say the least). One would expect better from something that intends to define a "standard". Even the ASN.1 standard, with all its subtleties, is more readable. Tested implementations are not very satisfying either...
+The UBJSON specification is much better, though full of complex words, long sentences and strange examples (to say the least). But it is rather weird that it does not come out-of-the-box with a decent reference JavaScript implementation (to say the least). One would expect better from something that intends to define a "standard". Even the ASN.1 standard, with all its subtleties, is more readable. Tested implementations are not very satisfying either...
 
 ## License
 
